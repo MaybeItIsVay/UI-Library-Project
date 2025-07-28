@@ -1,322 +1,323 @@
 --[[
-    UI Library Source Code
-    - Author: Gemini
-    - Version: 2.0
-    - Description: A comprehensive UI library for Roblox.
-    - Instructions: Host this file on GitHub and use the raw file URL to load it.
+    UI Library
+    Description: A versatile and customizable UI library for Roblox.
+    Author: [Your Name/Pseudonym]
+    Version: 1.0
 ]]
 
--- // services
-local ts = game:GetService("TweenService")
-local uis = game:GetService("UserInputService")
-local rs = game:GetService("RunService")
-local cre = game:GetService("CoreGui")
-local plrs = game:GetService("Players")
-local hs = game:GetService("HttpService")
-local ws = game:GetService("Workspace")
+-- // Services
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 
--- // variables
-local library = {}
-local pages, sections, multisections, mssections = {}, {}, {}, {}
-local toggles, buttons, sliders, dropdowns, multiboxs, buttonboxs, textboxs, keybinds, colorpickers = {}, {}, {}, {}, {}, {}, {}, {}, {}
-local configloaders, watermarks, loaders, utility = {}, {}, {}, {}
+-- // Local Player
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 
-local check_exploit = (syn and "Synapse") or (KRNL_LOADED and "Krnl") or (isourclosure and "ScriptWare") or nil
-local plr = plrs.LocalPlayer
-local cam = ws.CurrentCamera
+-- // Library Tables
+local Library = {}
+Library.__index = Library
 
--- // Metatable indexing
-library.__index = library
-pages.__index = pages
-sections.__index = sections
-multisections.__index = multisections
-mssections.__index = mssections
-toggles.__index = toggles
-buttons.__index = buttons
-sliders.__index = sliders
-dropdowns.__index = dropdowns
-multiboxs.__index = multiboxs
-buttonboxs.__index = buttonboxs
-textboxs.__index = textboxs
-keybinds.__index = keybinds
-colorpickers.__index = colorpickers
-configloaders.__index = configloaders
-watermarks.__index = watermarks
-loaders.__index = loaders
+local Pages = {}
+Pages.__index = Pages
+
+local Sections = {}
+Sections.__index = Sections
+
+local Toggles = {}
+Toggles.__index = Toggles
+
+local Buttons = {}
+Buttons.__index = Buttons
+
+local Sliders = {}
+Sliders.__index = Sliders
+
+local Dropdowns = {}
+Dropdowns.__index = Dropdowns
+
+local MultiBoxes = {}
+MultiBoxes.__index = MultiBoxes
+
+local TextBoxes = {}
+TextBoxes.__index = TextBoxes
+
+local Keybinds = {}
+Keybinds.__index = Keybinds
+
+local ColorPickers = {}
+ColorPickers.__index = ColorPickers
 
 -- // Utility Functions
-function utility.new(instance, properties)
-	local ins = Instance.new(instance)
-	for prop, val in pairs(properties) do
-		ins[prop] = val
-	end
-	return ins
+local Utility = {}
+
+function Utility.CreateInstance(instanceType, properties)
+    local instance = Instance.new(instanceType)
+    for property, value in pairs(properties) do
+        instance[property] = value
+    end
+    return instance
 end
 
-function utility.dragify(frame, drag_part)
-	local dragging, dragInput, dragStart, startPos
-	drag_part.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging, dragStart, startPos = true, input.Position, frame.Position
-			local conn
-			conn = input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-					conn:Disconnect()
-				end
-			end)
-		end
-	end)
-	drag_part.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
-	uis.InputChanged:Connect(function(input)
-		if input == dragInput and dragging then
-			local delta = input.Position - dragStart
-			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-		end
-	end)
-end
+function Utility.Draggable(frame, handle)
+    local dragging = false
+    local dragInput
+    local dragStart
+    local startPos
 
-function utility.round(n, d) return tonumber(string.format("%." .. (d or 0) .. "f", n)) end
-function utility.capitalize(s) return s:gsub("^%l", string.upper) end
-function utility.splitenum(enum) local s = tostring(enum):split("."); return s[#s] end
-function utility.from_hex(h) local r,g,b = h:match("#?(%x%x)(%x%x)(%x%x)"); return Color3.fromRGB(tonumber(r,16), tonumber(g,16), tonumber(b,16)) end
-function utility.to_hex(c) return string.format("#%02X%02X%02X", c.R * 255, c.G * 255, c.B * 255) end
-function utility.removespaces(s) return s:gsub("%s", "") end
+    local function Update(input)
+        local delta = input.Position - dragStart
+        local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        frame.Position = newPos
+    end
+
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    handle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            Update(input)
+        end
+    end)
+end
 
 -- // Main Library Constructor
-function library:new(props)
-	local Name = props.Name or "new ui"
-	local TextSize = props.TextSize or 12
-	local Font = props.Font or "RobotoMono"
-	local Color = props.Color or Color3.fromRGB(225, 58, 81)
+function Library:New(props)
+    local window = {}
 
-	local window = {}
-	local screen = utility.new("ScreenGui", {
-		Name = tostring(math.random(1e6, 1e7 - 1)),
-		DisplayOrder = 999,
-		ResetOnSpawn = false,
-		ZIndexBehavior = "Global",
-		Parent = cre
-	})
+    -- // Main ScreenGui
+    local ScreenGui = Utility.CreateInstance("ScreenGui", {
+        Name = "UIScreenGui_" .. tostring(math.random(1, 10000)),
+        Parent = CoreGui,
+        ZIndexBehavior = Enum.ZIndexBehavior.Global,
+        ResetOnSpawn = false,
+    })
 
-	if (check_exploit == "Synapse" and syn.request) then syn.protect_gui(screen) end
+    -- // Main Frame
+    local MainFrame = Utility.CreateInstance("Frame", {
+        Name = "MainFrame",
+        Parent = ScreenGui,
+        Size = UDim2.new(0, 500, 0, 300),
+        Position = UDim2.new(0.5, -250, 0.5, -150),
+        BackgroundColor3 = Color3.fromRGB(35, 35, 35),
+        BorderSizePixel = 0,
+        Active = true,
+        Draggable = true,
+        Visible = true,
+    })
 
-	local outline = utility.new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color,
-		BorderColor3 = Color3.fromRGB(12, 12, 12),
-		BorderSizePixel = 1,
-		Size = UDim2.new(0, 500, 0, 606),
-		Position = UDim2.new(0.5, 0, 0.5, 0),
-		Parent = screen
-	})
+    -- // Header
+    local Header = Utility.CreateInstance("Frame", {
+        Name = "Header",
+        Parent = MainFrame,
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+        BorderSizePixel = 0,
+    })
 
-	local main_container = utility.new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-		BorderColor3 = Color3.fromRGB(56, 56, 56),
-		BorderSizePixel = 1,
-		Size = UDim2.new(1, -4, 1, -4),
-		Position = UDim2.new(0.5, 0, 0.5, 0),
-		Parent = outline
-	})
+    local Title = Utility.CreateInstance("TextLabel", {
+        Name = "Title",
+        Parent = Header,
+        Size = UDim2.new(1, 0, 1, 0),
+        Text = props.Title or "UI Library",
+        Font = Enum.Font.SourceSans,
+        TextSize = 18,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+        BorderSizePixel = 0,
+    })
 
-	local title_frame = utility.new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0),
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 20),
-		Position = UDim2.new(0.5, 0, 0, 5),
-		Parent = main_container
-	})
+    -- // Make the window draggable
+    Utility.Draggable(MainFrame, Header)
 
-	local titletext = utility.new("TextLabel", {
-		Parent = title_frame,
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, -10, 1, 0),
-		Position = UDim2.new(0.5, 0, 0.5, 0),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Font = Font,
-		Text = Name,
-		TextColor3 = Color3.fromRGB(255, 255, 255),
-		TextXAlignment = "Left",
-		TextSize = TextSize,
-	})
+    -- // Container for pages
+    local PagesContainer = Utility.CreateInstance("Frame", {
+        Name = "PagesContainer",
+        Parent = MainFrame,
+        Size = UDim2.new(1, 0, 1, -40),
+        Position = UDim2.new(0, 0, 0, 40),
+        BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+        BorderSizePixel = 0,
+    })
 
-	local tabs_buttons_container = utility.new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0),
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, -10, 0, 21),
-		Position = UDim2.new(0.5, 0, 0, 25),
-		ZIndex = 2,
-		Parent = main_container
-	})
+    window.ScreenGui = ScreenGui
+    window.MainFrame = MainFrame
+    window.PagesContainer = PagesContainer
+    window.Pages = {}
 
-	utility.new("UIListLayout", { FillDirection = "Horizontal", Padding = UDim.new(0, 2), Parent = tabs_buttons_container })
+    function window:CreatePage(pageProps)
+        local page = {}
+        setmetatable(page, Pages)
 
-	local tabs_content_container = utility.new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 1),
-		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
-		BorderColor3 = Color3.fromRGB(12, 12, 12),
-		BorderSizePixel = 1,
-		Size = UDim2.new(1, -10, 1, -55),
-		Position = UDim2.new(0.5, 0, 1, -5),
-		Parent = main_container
-	})
+        page.Parent = window
+        page.Name = pageProps.Name or "New Page"
 
-	utility.dragify(outline, title_frame)
+        -- // Page Button
+        local PageButton = Utility.CreateInstance("TextButton", {
+            Name = page.Name .. "Button",
+            Parent = Header,
+            Size = UDim2.new(0, 100, 1, 0),
+            Position = UDim2.new(0, #window.Pages * 100, 0, 0),
+            Text = page.Name,
+            Font = Enum.Font.SourceSans,
+            TextSize = 16,
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+            BorderSizePixel = 0,
+        })
 
-	window = {
-		["screen"] = screen,
-		["tabs"] = tabs_content_container,
-		["tabsbuttons"] = tabs_buttons_container,
-		["outline"] = outline,
-		["pages"] = {},
-		["pointers"] = {},
-		["dropdowns"] = {},
-		["multiboxes"] = {},
-		["buttonboxs"] = {},
-		["colorpickers"] = {},
-		["labels"] = {},
-		["key"] = Enum.KeyCode.RightShift,
-		["font"] = Font,
-		["textsize"] = TextSize,
-		["theme"] = { accent = Color },
-		["themeitems"] = { accent = { BackgroundColor3 = {outline}, BorderColor3 = {}, TextColor3 = {} } }
-	}
+        -- // Page Frame
+        local PageFrame = Utility.CreateInstance("ScrollingFrame", {
+            Name = page.Name .. "Frame",
+            Parent = PagesContainer,
+            Size = UDim2.new(1, 0, 1, 0),
+            Visible = #window.Pages == 0,
+            BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+            BorderSizePixel = 0,
+            CanvasSize = UDim2.new(0,0,0,0),
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        })
+        
+        local UIListLayout = Utility.CreateInstance("UIListLayout", {
+            Parent = PageFrame,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 10),
+        })
 
-	local toggled, cooldown, saved_pos = true, false, UDim2.new(0.5, 0, 0.5, 0)
-	uis.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == window.key and not cooldown then
-			cooldown = true
-			toggled = not toggled
-			if not toggled then
-				saved_pos = outline.Position
-				ts:Create(outline, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.new(0.5, 0, 1.5, 0) }):Play()
-			else
-				ts:Create(outline, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = saved_pos }):Play()
-			end
-			task.wait(0.5)
-			cooldown = false
-		end
-	end)
+        PageButton.MouseButton1Click:Connect(function()
+            for _, otherPage in pairs(window.Pages) do
+                otherPage.Frame.Visible = false
+            end
+            PageFrame.Visible = true
+        end)
 
-	table.insert(window.labels, titletext)
-	setmetatable(window, library)
-	return window
+        page.Frame = PageFrame
+        page.Button = PageButton
+        page.Sections = {}
+        
+        table.insert(window.Pages, page)
+
+        return page
+    end
+
+    return window
 end
 
--- All other library functions (pages, sections, toggles, buttons, etc.) go here...
--- The full script from the previous prompt is assumed to be here.
--- I am omitting it for brevity, but it should be included in your file.
--- ... (The rest of the library code from the prompt) ...
+function Pages:CreateSection(sectionProps)
+    local section = {}
+    setmetatable(section, Sections)
+    
+    section.Parent = self
+    section.Name = sectionProps.Name or "New Section"
+    
+    -- // Section Frame
+    local SectionFrame = Utility.CreateInstance("Frame", {
+        Name = section.Name,
+        Parent = self.Frame,
+        Size = UDim2.new(1, -20, 0, 200),
+        Position = UDim2.new(0, 10, 0, #self.Sections * 210),
+        BackgroundColor3 = Color3.fromRGB(55, 55, 55),
+        BorderSizePixel = 0,
+        LayoutOrder = #self.Sections,
+    })
+    
+    local UIListLayout = Utility.CreateInstance("UIListLayout", {
+        Parent = SectionFrame,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 5),
+    })
 
-function pages:section(props)
-	-- // properties
-	local name = props.name or props.Name or props.page or props.Page or props.pagename or props.Pagename or props.PageName or props.pageName or "new ui"
-	local side = props.side or props.Side or props.sectionside or props.Sectionside or props.SectionSide or props.sectionSide or "left"
-	local size = props.size or props.Size or props.yaxis or props.yAxis or props.YAxis or props.Yaxis or 200
-	side = side:lower()
-	-- // variables
-	local section = {}
-	-- // main
-	local sectionholder = utility.new(
-		"Frame",
-		{
-			BackgroundColor3 = Color3.fromRGB(24, 24, 24),
-			BorderColor3 = Color3.fromRGB(56, 56, 56),
-			BorderMode = "Inset",
-			BorderSizePixel = 1,
-			Size = UDim2.new(1,0,0,size),
-			Parent = self[side]
-		}
-	)
-	--
-	local outline = utility.new(
-		"Frame",
-		{
-			BackgroundColor3 = Color3.fromRGB(24, 24, 24),
-			BorderColor3 = Color3.fromRGB(12, 12, 12),
-			BorderMode = "Inset",
-			BorderSizePixel = 1,
-			Size = UDim2.new(1,0,1,0),
-			Parent = sectionholder
-		}
-	)
-	--
-	local color = utility.new(
-		"Frame",
-		{
-			AnchorPoint = Vector2.new(0.5,0),
-			BackgroundColor3 = self.library.theme.accent,
-			BorderSizePixel = 0,
-			Size = UDim2.new(1,-2,0,1),
-			Position = UDim2.new(0.5,0,0,0),
-			Parent = outline
-		}
-	)
-	--
-	table.insert(self.library.themeitems["accent"]["BackgroundColor3"],color)
-	--
-	local content = utility.new(
-		"Frame",
-		{
-			AnchorPoint = Vector2.new(0.5,1),
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Size = UDim2.new(1,-12,1,-25),
-			Position = UDim2.new(0.5,0,1,-5),
-			Parent = outline
-		}
-	)
-	--
-	local title = utility.new(
-		"TextLabel",
-		{
-			BackgroundTransparency = 1,
-			Size = UDim2.new(1,-5,0,20),
-			Position = UDim2.new(0,5,0,0),
-			Font = self.library.font,
-			Text = name,
-			TextColor3 = Color3.fromRGB(255,255,255),
-			TextSize = self.library.textsize,
-			TextStrokeTransparency = 0,
-			TextXAlignment = "Left",
-			Parent = outline
-		}
-	)
-	--
-	utility.new(
-		"UIListLayout",
-		{
-			FillDirection = "Vertical",
-			Padding = UDim.new(0,5),
-			Parent = content
-		}
-	)
-	-- // section tbl
-	section = {
-		["library"] = self.library,
-		["sectionholder"] = sectionholder,
-		["color"] = color,
-		["content"] = content,
-		["pointers"] = {}
-	}
-	--
-	local pointer = props.pointer or props.Pointer or props.pointername or props.Pointername or props.PointerName or props.pointerName or nil
-	--
-	if pointer then
-		if self.pointers then
-			self.pointers[tostring(pointer)] = section.pointers
-		end
-	end
-	--
-	self.library.labels[#self.library.labels+1] = title
-	-- // metatable indexing + return
-	setmetatable(section, sections)
-	return section
+    local SectionTitle = Utility.CreateInstance("TextLabel", {
+        Name = "SectionTitle",
+        Parent = SectionFrame,
+        Size = UDim2.new(1, 0, 0, 30),
+        Text = section.Name,
+        Font = Enum.Font.SourceSans,
+        TextSize = 16,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+        BorderSizePixel = 0,
+        LayoutOrder = -1,
+    })
+
+    section.Frame = SectionFrame
+    section.Elements = {}
+    
+    table.insert(self.Sections, section)
+    
+    return section
 end
-return library
+
+function Sections:CreateToggle(toggleProps)
+    local toggle = {}
+    setmetatable(toggle, Toggles)
+
+    toggle.Name = toggleProps.Name or "New Toggle"
+    toggle.Callback = toggleProps.Callback or function() end
+
+    local ToggleFrame = Utility.CreateInstance("Frame", {
+        Name = toggle.Name,
+        Parent = self.Frame,
+        Size = UDim2.new(1, -10, 0, 25),
+        BackgroundColor3 = Color3.fromRGB(65, 65, 65),
+        BorderSizePixel = 0,
+        LayoutOrder = #self.Elements,
+    })
+
+    local ToggleButton = Utility.CreateInstance("TextButton", {
+        Name = "ToggleButton",
+        Parent = ToggleFrame,
+        Size = UDim2.new(0, 20, 0, 20),
+        Position = UDim2.new(1, -25, 0.5, -10),
+        Text = "",
+        BackgroundColor3 = Color3.fromRGB(85, 85, 85),
+        BorderSizePixel = 0,
+    })
+
+    local ToggleLabel = Utility.CreateInstance("TextLabel", {
+        Name = "ToggleLabel",
+        Parent = ToggleFrame,
+        Size = UDim2.new(1, -30, 1, 0),
+        Text = toggle.Name,
+        Font = Enum.Font.SourceSans,
+        TextSize = 14,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        BackgroundColor3 = Color3.fromRGB(65, 65, 65),
+        BorderSizePixel = 0,
+    })
+    
+    local toggled = false
+    ToggleButton.MouseButton1Click:Connect(function()
+        toggled = not toggled
+        ToggleButton.BackgroundColor3 = toggled and Color3.fromRGB(105, 185, 105) or Color3.fromRGB(85, 85, 85)
+        toggle.Callback(toggled)
+    end)
+    
+    table.insert(self.Elements, toggle)
+    
+    return toggle
+end
+
+return Library
